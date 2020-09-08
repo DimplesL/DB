@@ -8,11 +8,12 @@ from experiment import Structure, Experiment
 from concern.config import Configurable, Config
 import math
 
+
 def main():
     parser = argparse.ArgumentParser(description='Text Recognition Training')
-    parser.add_argument('exp', type=str)
-    parser.add_argument('--resume', type=str, help='Resume from checkpoint')
-    parser.add_argument('--image_path', type=str, help='image path')
+    parser.add_argument('--exp', type=str, default='experiments/seg_detector/ic15_resnet18_deform_thre.yaml')
+    parser.add_argument('--resume', type=str, default='/Users/qiuyurui/Downloads/ic15_resnet18', help='Resume from checkpoint')
+    parser.add_argument('--image_path', type=str, default='/Users/qiuyurui/Desktop/Text-Detect-Data/11/96591824_11_53.jpg', help='image path')
     parser.add_argument('--result_dir', type=str, default='./demo_results/', help='path to save results')
     parser.add_argument('--data', type=str,
                         help='The name of dataloader which will be evaluated on.')
@@ -86,7 +87,7 @@ class Demo:
             new_height = int(math.ceil(new_width / width * height / 32) * 32)
         resized_img = cv2.resize(img, (new_width, new_height))
         return resized_img
-        
+
     def load_image(self, image_path):
         img = cv2.imread(image_path, cv2.IMREAD_COLOR).astype('float32')
         original_shape = img.shape[:2]
@@ -95,7 +96,7 @@ class Demo:
         img /= 255.
         img = torch.from_numpy(img).permute(2, 0, 1).float().unsqueeze(0)
         return img, original_shape
-        
+
     def format_output(self, batch, output):
         batch_boxes, batch_scores = output
         for index in range(batch['image'].size(0)):
@@ -118,11 +119,11 @@ class Demo:
                         score = scores[i]
                         if score < self.args['box_thresh']:
                             continue
-                        box = boxes[i,:,:].reshape(-1).tolist()
+                        box = boxes[i, :, :].reshape(-1).tolist()
                         result = ",".join([str(int(x)) for x in box])
                         res.write(result + ',' + str(score) + "\n")
-        
-    def inference(self, image_path, visualize=False):
+
+    def inference(self, image_path, visualize=True):
         self.init_torch_tensor()
         model = self.init_model()
         self.resume(model, self.model_path)
@@ -135,14 +136,16 @@ class Demo:
         with torch.no_grad():
             batch['image'] = img
             pred = model.forward(batch, training=False)
-            output = self.structure.representer.represent(batch, pred, is_output_polygon=self.args['polygon']) 
+            output = self.structure.representer.represent(batch, pred, is_output_polygon=self.args['polygon'])
             if not os.path.isdir(self.args['result_dir']):
                 os.mkdir(self.args['result_dir'])
             self.format_output(batch, output)
 
             if visualize and self.structure.visualizer:
                 vis_image = self.structure.visualizer.demo_visualize(image_path, output)
-                cv2.imwrite(os.path.join(self.args['result_dir'], image_path.split('/')[-1].split('.')[0]+'.jpg'), vis_image)
+                cv2.imwrite(os.path.join(self.args['result_dir'], image_path.split('/')[-1].split('.')[0] + '.jpg'),
+                            vis_image)
+
 
 if __name__ == '__main__':
     main()
